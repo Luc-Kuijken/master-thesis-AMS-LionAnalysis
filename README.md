@@ -148,22 +148,9 @@ Comprehensive logging system:
 ## Contributing
 
 This is a research project. For questions or collaboration:
-- Contact: [Your Name/Email]
-- Institution: [Your Institution]
+- Contact: [l.c.kuijken@student.tue.nl]
+- Institution: [Eindhoven Technical Uinversity]
 
 ## License
 
-[Specify your license - e.g., MIT, GPL, or Academic/Research Use Only]
-
-## Acknowledgments
-
-- AMS/SCM software suite for molecular dynamics simulations
-- [Your advisor/research group]
-- [Funding sources]
-
-## Citation
-
-If you use this code in your research, please cite:
-```
-[Your thesis citation to be added]
-```
+This code is open source
