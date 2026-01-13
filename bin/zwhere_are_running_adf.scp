@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Developed by J.M. Vicent-Luna
+# LAST UPDATED 12-03-2025 (DD-MM-YYYY)
+
+var1ams=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g')
+
+var2ams=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+
+echo ""
+
+echo "" ; echo "     =================================  ams " ; echo "" ;  ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g' ; echo "     ___" ; echo ""
+
+echo "      ams:     "$var2ams 
+
+echo "" ; echo "     =================================  python " ; echo ""
+
+
+pgrep python | awk '{print $1}' > tmp-proc
+
+while read line; do 
+   pcount=$(ps -p $line -o %cpu | tail -1 | awk '{printf"%3i\n", $1/100}')
+   plocation=$(pwdx $line | awk '{print $2}' | sed 's/ams.results\/worker.0.0.0//g') 
+    
+   echo "    " $pcount $plocation
+
+   echo $pcount >> tmp-count
+
+done < tmp-proc
+
+echo "     ___" ; echo ""
+
+if [ -f "tmp-count" ] ; then var2python=$(cat tmp-count | awk '{ SUM += $1} END {print "     "SUM}') ; fi
+
+echo "      python: "$var2python ; echo ""
+
+rm tmp-proc
+if [ -f "tmp-count" ] ; then rm tmp-count ; fi
+
+
+
+
+#var1ams=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g')
+#
+#var1adf=$(ps -ef | grep "adf.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g')
+#
+#var2ams=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#var2adf=$(ps -ef | grep "adf.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#
+#var3amsv=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | grep "vicent" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#var3adfv=$(ps -ef | grep "adf.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | grep "vicent" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#var3amss=$(ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | grep "sander" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#var3adfs=$(ps -ef | grep "adf.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | grep "sander" | awk '{print $16}' | sort -g | uniq -c | awk '{ SUM += $1} END {print "     "SUM}')
+#
+#echo ""
+#
+#echo "" ; echo "     =================================  ams " ; echo "" ;  ps -ef | grep "ams.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g' ; echo "     ___" ; echo ""
+#
+#echo "" ; echo "     =================================  adf " ; echo "" ;  ps -ef | grep "adf.exe" | grep -v "/bin/sh" | grep -v "mpiexe" | grep -v "grep" | awk '{print $16}' | sort -g | uniq -c | sed 's/-DSCM_WD=//g' ; echo "     ___" ; echo ""
+#
+#
+#echo "      ams:     "$var2ams
+#
+#echo "      adf:     "$var2adf
+#
+#total=$(echo $var2ams $var2adf | awk '{print $1+$2}')
+#
+#totalv=$(echo $var3amsv $var3adfv | awk '{print $1+$2}')
+#totals=$(echo $var3amss $var3adfs | awk '{print $1+$2}')
+#
+#echo "" ; echo "     =================================" ; echo "" ; echo "      Vicent:   "$totalv ; echo "      Sander:   "$totals ; echo ""  ;  echo "      Total:   "$total
+#
+#
+#echo "" ; echo "     =================================" ; echo ""
+
+
+
+
+

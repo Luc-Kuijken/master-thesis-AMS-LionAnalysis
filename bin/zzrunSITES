@@ -1,0 +1,208 @@
+#!/bin/bash
+# =====================================================================
+# run_sites_analysis.sh
+# ---------------------------------------------------------------------
+# Analyze PDB trajectories using SITES-ANALYZER to compute 
+# Average Occupation Profiles (AvOPs)
+#
+# Usage:
+#   zzrunSITES TRAJECTORY.pdb [sites.input]
+#
+# Author: L. Kuijken
+# Last updated: 2025-11-14
+# =====================================================================
+
+# Check if trajectory file provided
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 TRAJECTORY.pdb [sites.input]"
+    echo
+    echo "Arguments:"
+    echo "  TRAJECTORY.pdb    Path to PDB trajectory file"
+    echo "  sites.input       Optional: path to sites.input config (default: ../sites.input)"
+    exit 1
+fi
+
+# =====================================================================
+# SETUP
+# =====================================================================
+TARGET="$(realpath "$1" 2>/dev/null || realpath -s "$1" 2>/dev/null || printf '%s\n' "$1")"
+BASE="$(basename "$TARGET")"
+PARENT="$(dirname "$TARGET")"
+
+# Check if trajectory file exists
+if [ ! -f "$TARGET" ]; then
+    echo "Error: Trajectory file not found: $TARGET"
+    exit 1
+fi
+
+# Sites input file location
+if [ $# -ge 2 ]; then
+    SITES_INPUT="$2"
+else
+    SITES_INPUT="$PARENT/sites.input"
+fi
+
+if [ ! -f "$SITES_INPUT" ]; then
+    echo "Error: sites.input file not found at: $SITES_INPUT"
+    echo "Please provide sites.input in parent directory or specify path as second argument"
+    exit 1
+fi
+
+# Determine analysis directory
+if [ $# -ge 3 ] && [ -n "$3" ]; then
+    ANALYSIS_DIR="$3"
+else
+    ANALYSIS_DIR="$HOME/master_thesis_project/SitesAnalysis"
+fi
+
+# Output naming
+NAME="${BASE%_traj*}"
+NAME="${NAME#MD_}"
+OUTDIR="$ANALYSIS_DIR/AvOPs/MD_${NAME}"
+DATADIR="$ANALYSIS_DIR/data_files"
+
+echo "[$(date +%H:%M:%S)] Starting SITES analysis for: $NAME"
+echo "[$(date +%H:%M:%S)] Trajectory: $TARGET"
+echo "[$(date +%H:%M:%S)] Config: $SITES_INPUT"
+echo "[$(date +%H:%M:%S)] Output directory: $OUTDIR"
+echo "[$(date +%H:%M:%S)] Data directory: $DATADIR"
+
+# =====================================================================
+# CREATE TEMPORARY WORKSPACE
+# =====================================================================
+TEMPDIR=$(mktemp -d -t sites_analysis_XXXXXX)
+if [ ! -d "$TEMPDIR" ]; then
+    echo "Error: Failed to create temporary directory"
+    exit 1
+fi
+
+echo "[$(date +%H:%M:%S)] Working in temporary directory: $TEMPDIR"
+
+# Ensure cleanup on exit
+trap "rm -rf '$TEMPDIR'" EXIT INT TERM
+
+# Move to temporary directory
+ORIGINAL_DIR="$PWD"
+cd "$TEMPDIR" || { echo "Error: Cannot cd to temp directory"; exit 1; }
+
+# =====================================================================
+# CLEANUP OLD RESULTS IN ORIGINAL DIRECTORY
+# =====================================================================
+if [ -d "$ORIGINAL_DIR/$OUTDIR" ]; then 
+    echo "[$(date +%H:%M:%S)] Removing old output directory: $OUTDIR"
+    rm -r "$ORIGINAL_DIR/$OUTDIR"
+fi
+
+# =====================================================================
+# PREPARE INPUT FILES
+# =====================================================================
+echo "[$(date +%H:%M:%S)] Preparing input files..."
+
+cp "$SITES_INPUT" sites.input
+cp "$TARGET" INPUT.pdb
+
+# Extract atom positions
+grep "ATOM" INPUT.pdb | awk '{print $5,$6,$7}' > atom-positions.dat
+
+# Handle site positions if needed
+compsites=$(grep "ComputeSites" sites.input | awk '{print $2}')
+writesites=$(grep "WriteSitesSurfacePDB" sites.input | awk '{print $2}')
+
+if [ "$compsites" = "yes" ] || [ "$writesites" = "yes" ]; then
+    Fname=$(grep "FrameworkName" sites.input | awk '{print $2}')
+    if [ -f "${Fname}_Framework_sites.pdb" ]; then
+        grep "ATOM" "${Fname}_Framework_sites.pdb" | awk '{print $3,$5,$6,$7}' > SITE-positions.dat
+    else
+        echo "[$(date +%H:%M:%S)] Warning: ${Fname}_Framework_sites.pdb not found"
+        echo " " > SITE-positions.dat
+    fi
+else
+    echo " " > SITE-positions.dat
+fi
+
+# Create Fortran input file
+wc -l INPUT.pdb | awk '{print $1}' > input-fortran
+grep MODEL INPUT.pdb | wc -l >> input-fortran
+wc -l atom-positions.dat | awk '{print $1}' >> input-fortran
+grep "CRYST" INPUT.pdb | head -1 | awk '{print $2,$3,$4,$5,$6,$7}' >> input-fortran
+grep -v "#" sites.input >> input-fortran
+
+# =====================================================================
+# RUN SITES-ANALYZER
+# =====================================================================
+echo "[$(date +%H:%M:%S)] Creating output directories..."
+mkdir -p AvOPs/1D AvOPs/2D
+
+echo "[$(date +%H:%M:%S)] Running SITES-ANALYZER..."
+if [ ! -x "/home/luc/SITES-ANALYZER/execute/site.x" ]; then
+    echo "Error: SITES-ANALYZER executable not found or not executable"
+    exit 1
+fi
+
+/home/luc/SITES-ANALYZER/execute/site.x
+
+if [ $? -ne 0 ]; then
+    echo "Error: SITES-ANALYZER failed"
+    exit 1
+fi
+
+# =====================================================================
+# GENERATE PLOTS
+# =====================================================================
+avops=$(grep "ComputeAverageOccupationProfiles2D" sites.input | awk '{print $2}')
+if [ "$avops" = "yes" ]; then
+    echo "[$(date +%H:%M:%S)] Generating 2D plots..."
+    cp /home/luc/SITES-ANALYZER/gnuplot-script/plot-AvOPs-2D.gnuplot AvOPs/2D/
+    cd AvOPs/2D
+    gnuplot plot-AvOPs-2D.gnuplot
+    cd ../../
+fi
+
+# =====================================================================
+# ORGANIZE OUTPUT
+# =====================================================================
+echo "[$(date +%H:%M:%S)] Organizing output files..."
+
+# Return to original directory
+cd "$ORIGINAL_DIR" || { echo "Error: Cannot return to original directory"; exit 1; }
+
+# Create output directories
+mkdir -p "$OUTDIR" || { echo "Failed to create $OUTDIR"; exit 1; }
+mkdir -p "$DATADIR" || { echo "Failed to create $DATADIR"; exit 1; }
+
+# Move data files from temp to final locations
+if [ -f "$TEMPDIR/AvOPs/2D/AvOPs-2D-XY.dat" ]; then
+    mv "$TEMPDIR/AvOPs/2D/AvOPs-2D-XY.dat" "$DATADIR/AvOPs_${NAME}_2D_XY.dat"
+fi
+if [ -f "$TEMPDIR/AvOPs/2D/AvOPs-2D-YZ.dat" ]; then
+    mv "$TEMPDIR/AvOPs/2D/AvOPs-2D-YZ.dat" "$DATADIR/AvOPs_${NAME}_2D_YZ.dat"
+fi
+if [ -f "$TEMPDIR/AvOPs/2D/AvOPs-2D-ZX.dat" ]; then
+    mv "$TEMPDIR/AvOPs/2D/AvOPs-2D-ZX.dat" "$DATADIR/AvOPs_${NAME}_2D_ZX.dat"
+fi
+
+# Move results
+if [ -d "$TEMPDIR/AvOPs" ]; then
+    mv "$TEMPDIR/AvOPs"/* "$OUTDIR"/ 2>/dev/null
+fi
+
+# Move additional output files
+if [ -f "$TEMPDIR/output-SITE.data" ]; then
+    mv "$TEMPDIR/output-SITE.data" "$OUTDIR"/
+fi
+if [ -f "$TEMPDIR/3D-sites-surface.pdb" ]; then
+    mv "$TEMPDIR/3D-sites-surface.pdb" "$OUTDIR"/
+fi
+
+# =====================================================================
+# SUMMARY
+# =====================================================================
+echo ""
+echo "============================================="
+echo "SITES Analysis Complete"
+echo "============================================="
+echo "Results directory: $OUTDIR"
+echo "Data files: $DATADIR"
+echo "Trajectory: $NAME"
+echo "============================================="
+echo ""
