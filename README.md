@@ -1,14 +1,16 @@
 # Master Thesis Project: Trajectory Analysis for Molecular Dynamics Simulations
 
-A comprehensive toolkit for analyzing molecular dynamics trajectories of water and hydronium systems in Metal-Organic Frameworks (MOFs), specifically UiO-66.
+A toolbox for analyzing molecular dynamics trajectories of water and hydronium systems in Metal-Organic Frameworks (MOFs), specifically UiO-66.
 
 ## Project Overview
 
 This project provides tools for:
+-**MD Simulation setup**: Creates structure and run.run files for AMS simulations
+-**File conversion**: Converts ams.rkf files into .xyz or .pdb files
 - **Trajectory analysis**: RDF, MSD, hydrogen bonding, proton transfer events
-- **Parallel processing**: Efficient batch analysis of multiple trajectories
+- **Parallel processing**: bash scripts for fast batch analysis of multiple trajectories
 - **Visualization**: Automated plotting and data export
-- **Simulation management**: AMS/SCM workflow integration
+- **Matlab Postprocessing**: A matlab toolbox that can be used to find macroscopic paraneters
 
 ## Project Structure
 
@@ -31,7 +33,7 @@ master_thesis_project/
 │   ├── xyz/                    # XYZ format trajectories
 │   └── pdb/                    # PDB format trajectories
 │
-├── LionAnalysis/               # Analysis results (Lion = Li+ ion studies)
+├── LionAnalysis/               # Analysis results
 │   ├── MD_33H2O/              # Results for small system
 │   ├── MD_65H2O/              # Results for medium system
 │   ├── MD_98H2O/              # Results for large system
